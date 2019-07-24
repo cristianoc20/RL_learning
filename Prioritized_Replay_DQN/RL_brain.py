@@ -6,11 +6,9 @@ tf.set_random_seed(1)
 
 
 class SumTree(object):
-    """
-    This SumTree code is a modified version and the original code is from:
-    https://github.com/jaara/AI-blog/blob/master/SumTree.py
-    Story data with its priority in the tree.
-    """
+    # 建立tree和data。
+    # 因为SumTree有特殊的数据结构
+    # 所以两者都能用一个一维np.array来存储
     data_pointer = 0
 
     def __init__(self, capacity):
@@ -22,6 +20,7 @@ class SumTree(object):
         # [--------------data frame-------------]
         #             size: capacity
 
+    #当有新的sample时，添加进tree和data
     def add(self, p, data):
         tree_idx = self.data_pointer + self.capacity - 1
         self.data[self.data_pointer] = data  # update data_frame
@@ -31,6 +30,7 @@ class SumTree(object):
         if self.data_pointer >= self.capacity:  # replace when exceed the capacity
             self.data_pointer = 0
 
+    #当sample被train,有了新的TD-error,就在tree中更新
     def update(self, tree_idx, p):
         change = p - self.tree[tree_idx]
         self.tree[tree_idx] = p
@@ -39,6 +39,7 @@ class SumTree(object):
             tree_idx = (tree_idx - 1) // 2
             self.tree[tree_idx] += change
 
+    #根据选取的v点抽取样本
     def get_leaf(self, v):
         """
         Tree structure and array storage:
@@ -84,15 +85,18 @@ class Memory(object):  # stored as ( s, a, r, s_ ) in SumTree
     beta_increment_per_sampling = 0.001
     abs_err_upper = 1.  # clipped abs error
 
+    #建立SumTree和各种参数
     def __init__(self, capacity):
         self.tree = SumTree(capacity)
 
+    #存储数据，更新SumTree
     def store(self, transition):
         max_p = np.max(self.tree.tree[-self.tree.capacity:])
         if max_p == 0:
             max_p = self.abs_err_upper
         self.tree.add(max_p, transition)   # set the max p for new p
 
+    #抽取sample
     def sample(self, n):
         b_idx, b_memory, ISWeights = np.empty((n,), dtype=np.int32), np.empty((n, self.tree.data[0].size)), np.empty((n, 1))
         pri_seg = self.tree.total_p / n       # priority segment
@@ -108,6 +112,7 @@ class Memory(object):  # stored as ( s, a, r, s_ ) in SumTree
             b_idx[i], b_memory[i, :] = idx, data
         return b_idx, b_memory, ISWeights
 
+    #train完被抽取的samples后更新在tree中的sample的priority
     def batch_update(self, tree_idx, abs_errors):
         abs_errors += self.epsilon  # convert to abs and avoid 0
         clipped_errors = np.minimum(abs_errors, self.abs_err_upper)
